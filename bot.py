@@ -8,7 +8,8 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from moviepy.editor import VideoFileClip
+# NEW (MoviePy v2+)
+from moviepy import VideoFileClip
 
 # Configure logging
 logging.basicConfig(
@@ -77,7 +78,8 @@ async def convert_video_to_audio(update: Update, context: ContextTypes.DEFAULT_T
             clip.close()
             return
 
-        clip.audio.write_audiofile(audio_path, logger=None)
+        # NEW
+        clip.audio.write_audiofile(audio_path)
         clip.close()
 
         await status_msg.edit_text("📤 Uploading MP3 audio...")
