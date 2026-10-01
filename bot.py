@@ -1,5 +1,6 @@
 import os
 import logging
+import ffmpeg
 from telegram import Update, BotCommand
 from telegram.ext import (
     ApplicationBuilder,
@@ -8,8 +9,6 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-# Fixed import for MoviePy 2.0+
-from moviepy import VideoFileClip
 
 # Configure logging
 logging.basicConfig(
@@ -53,7 +52,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def convert_video_to_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles incoming videos and converts MP4 to MP3."""
+    """Handles incoming videos and converts MP4 to MP3 using direct ffmpeg."""
     message = update.message
     video = message.video or message.video_note or message.document
 
@@ -65,22 +64,20 @@ async def convert_video_to_audio(update: Update, context: ContextTypes.DEFAULT_T
     audio_path = f"audio_{message.message_id}.mp3"
 
     try:
-        # Download the video file from Telegram
+        # Download video from Telegram
         file = await context.bot.get_file(video.file_id)
         await file.download_to_drive(video_path)
 
         await status_msg.edit_text("🔄 Converting MP4 to MP3...")
 
-        # Process conversion with MoviePy 2.0+
-        clip = VideoFileClip(video_path)
-        if clip.audio is None:
-            await status_msg.edit_text("❌ Error: This video file contains no audio stream.")
-            clip.close()
-            return
-
-        # Write audio file (removed deprecated logger argument)
-        clip.audio.write_audiofile(audio_path)
-        clip.close()
+        # Extract audio directly using ffmpeg
+        (
+            ffmpeg
+            .input(video_path)
+            .output(audio_path, qscale=0, map='a')
+            .overwrite_output()
+            .run(quiet=True)
+        )
 
         await status_msg.edit_text("📤 Uploading MP3 audio...")
 
@@ -94,12 +91,15 @@ async def convert_video_to_audio(update: Update, context: ContextTypes.DEFAULT_T
 
         await status_msg.delete()
 
+    except ffmpeg.Error as e:
+        logger.error(f"FFmpeg conversion error: {e}")
+        await status_msg.edit_text("❌ Failed to convert: Make sure the video contains an audio track.")
     except Exception as e:
         logger.error(f"Conversion failed: {e}")
         await status_msg.edit_text(f"❌ Failed to process video: {str(e)}")
 
     finally:
-        # Clean up local temporary files
+        # Clean up temporary local files
         if os.path.exists(video_path):
             os.remove(video_path)
         if os.path.exists(audio_path):
@@ -111,7 +111,7 @@ def main():
         logger.error("TELEGRAM_BOT_TOKEN environment variable missing!")
         return
 
-    # Build the Application with post_init hook
+    # Build Application
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
     # Add Command & Message Handlers
