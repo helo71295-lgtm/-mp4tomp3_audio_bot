@@ -8,7 +8,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-# NEW (MoviePy v2+)
+# Fixed import for MoviePy 2.0+
 from moviepy import VideoFileClip
 
 # Configure logging
@@ -71,14 +71,14 @@ async def convert_video_to_audio(update: Update, context: ContextTypes.DEFAULT_T
 
         await status_msg.edit_text("🔄 Converting MP4 to MP3...")
 
-        # Process conversion with MoviePy
+        # Process conversion with MoviePy 2.0+
         clip = VideoFileClip(video_path)
         if clip.audio is None:
             await status_msg.edit_text("❌ Error: This video file contains no audio stream.")
             clip.close()
             return
 
-        # NEW
+        # Write audio file (removed deprecated logger argument)
         clip.audio.write_audiofile(audio_path)
         clip.close()
 
@@ -111,7 +111,7 @@ def main():
         logger.error("TELEGRAM_BOT_TOKEN environment variable missing!")
         return
 
-    # Build the Application with post_init hook to set commands menu
+    # Build the Application with post_init hook
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
     # Add Command & Message Handlers
